@@ -13,10 +13,13 @@ class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
 
-        val medicineName = intent.getStringExtra("name") ?: "Medicine"
+        val medicineName =
+            intent.getStringExtra("name") ?: "Medicine"
 
         val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            context.getSystemService(
+                Context.NOTIFICATION_SERVICE
+            ) as NotificationManager
 
         val channelId = "sagar_medicine_reminder"
 
@@ -25,10 +28,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 channelId,
                 "Sagar Medicine Reminder",
                 NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Daily medicine reminders"
-                enableVibration(true)
-            }
+            )
 
             notificationManager.createNotificationChannel(channel)
         }

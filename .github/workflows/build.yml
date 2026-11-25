@@ -29,9 +29,6 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Build APK
         run: gradle assembleDebug
 
@@ -40,4 +37,3 @@ jobs:
         with:
           name: Sagar-Medicine-Reminder-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-          

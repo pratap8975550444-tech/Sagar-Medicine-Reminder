@@ -17,29 +17,114 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Auto Setup Properties, Manifest, Profile and Medicine Screens
+      - name: Auto Setup Full Android Project & App
         run: |
-          echo "kotlin.jvm.target.validation.mode=ignore" >> gradle.properties
-          echo "android.suppressUnsupportedCompileSdk=35" >> gradle.properties
+          ns=$(python3 -c 'print(bytes.fromhex("687474703a2f2f736368656d61732e616e64726f69642e636f6d2f61706b2f7265732f616e64726f6964").decode())')
+
+          # १. मुख्य प्रोजेक्ट फाईल्स (settings.gradle आणि build.gradle) तयार करा
+          cat << 'EOF' > settings.gradle
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "SagarMedicineReminder"
+          include ':app'
+          EOF
+
+          cat << 'EOF' > build.gradle
+          plugins {
+              id 'com.android.application' version '8.2.2' apply false
+              id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
+          }
+          EOF
+
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          kotlin.code.style=official
+          kotlin.jvm.target.validation.mode=ignore
+          EOF
 
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/java/com/sagar/medicinereminder
-          ns=$(python3 -c 'print(bytes.fromhex("687474703a2f2f736368656d61732e616e64726f69642e636f6d2f61706b2f7265732f616e64726f6964").decode())')
 
-          # १. AndroidManifest.xml तयार करा
+          # २. app/build.gradle तयार करा
+          cat << 'EOF' > app/build.gradle
+          plugins {
+              id 'com.android.application'
+              id 'org.jetbrains.kotlin.android'
+          }
+          android {
+              namespace 'com.sagar.medicinereminder'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.sagar.medicinereminder"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = '17' }
+          }
+          dependencies {
+              implementation 'androidx.core:core-ktx:1.12.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+          }
+          EOF
+
+          # ३. AndroidManifest.xml तयार करा
           printf '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="%s">\n<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\n<application android:allowBackup="true" android:label="Sagar Medicine Reminder" android:theme="@style/Theme.AppCompat.Light.DarkActionBar">\n<activity android:name=".CreateProfileActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity>\n<activity android:name=".MainActivity" android:exported="false" />\n<receiver android:name=".ReminderReceiver" android:enabled="true" android:exported="false" />\n</application>\n</manifest>' "$ns" > app/src/main/AndroidManifest.xml
 
-          # २. प्रोफाईल स्क्रीन लेआउट (activity_create_profile.xml)
+          # ४. प्रोफाईल स्क्रीन लेआउट (activity_create_profile.xml)
           printf '<?xml version="1.0" encoding="utf-8"?>\n<LinearLayout xmlns:android="%s" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="24dp" android:gravity="center_horizontal">\n<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Create Your Profile" android:textSize="22sp" android:textStyle="bold" android:layout_marginBottom="20dp" />\n<ImageView android:id="@+id/ivProfilePic" android:layout_width="110dp" android:layout_height="110dp" android:src="@android:drawable/ic_menu_camera" android:background="#E0E0E0" android:scaleType="centerCrop" android:layout_marginBottom="16dp" />\n<EditText android:id="@+id/etUserName" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Enter Full Name" android:inputType="textPersonName" android:layout_marginBottom="12dp" />\n<EditText android:id="@+id/etUserAge" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Enter Age" android:inputType="number" android:layout_marginBottom="24dp" />\n<Button android:id="@+id/btnSaveProfile" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save Profile and Continue" />\n</LinearLayout>' "$ns" > app/src/main/res/layout/activity_create_profile.xml
 
-          # ३. पॅकेज नाव शोधून प्रोफाईल आणि मुख्य स्क्रीन कोड आपोआप तयार करा
-          PKG=$(grep -rh "^package " app/src/main/java/ | head -n 1 | awk '{print $2}' | tr -d '\r')
-          if [ -z "$PKG" ]; then PKG="com.sagar.medicinereminder"; fi
-          PKG_DIR="app/src/main/java/$(echo $PKG | tr '.' '/')"
-          mkdir -p "$PKG_DIR"
+          # ५. ReminderReceiver.kt तयार करा (अलार्म वाजण्यासाठी)
+          cat << 'EOF' > app/src/main/java/com/sagar/medicinereminder/ReminderReceiver.kt
+          package com.sagar.medicinereminder
 
-          cat << EOF > "$PKG_DIR/CreateProfileActivity.kt"
-          package $PKG
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.content.BroadcastReceiver
+          import android.content.Context
+          import android.content.Intent
+          import android.media.RingtoneManager
+          import android.os.Build
+          import androidx.core.app.NotificationCompat
+
+          class ReminderReceiver : BroadcastReceiver() {
+              override fun onReceive(context: Context, intent: Intent) {
+                  val medName = intent.getStringExtra("MEDICINE_NAME") ?: "Medicine Time"
+                  val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                  val channelId = "med_reminder_channel"
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      val ch = NotificationChannel(channelId, "Medicine Reminder", NotificationManager.IMPORTANCE_HIGH)
+                      nm.createNotificationChannel(ch)
+                  }
+                  val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                  val notif = NotificationCompat.Builder(context, channelId)
+                      .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                      .setContentTitle("औषध घेण्याची वेळ झाली आहे!")
+                      .setContentText(medName)
+                      .setPriority(NotificationCompat.PRIORITY_HIGH)
+                      .setSound(sound)
+                      .setAutoCancel(true)
+                      .build()
+                  nm.notify(System.currentTimeMillis().toInt(), notif)
+              }
+          }
+          EOF
+
+          # ६. CreateProfileActivity.kt तयार करा
+          cat << 'EOF' > app/src/main/java/com/sagar/medicinereminder/CreateProfileActivity.kt
+          package com.sagar.medicinereminder
 
           import android.content.Context
           import android.content.Intent
@@ -93,87 +178,11 @@ jobs:
           }
           EOF
 
-          cat << EOF > "$PKG_DIR/MainActivity.kt"
-          package $PKG
+          # ७. MainActivity.kt तयार करा (तिन्ही बॉक्स + Edit/Delete + औषधांची यादी)
+          cat << 'EOF' > app/src/main/java/com/sagar/medicinereminder/MainActivity.kt
+          package com.sagar.medicinereminder
 
           import android.Manifest
           import android.app.AlarmManager
           import android.app.AlertDialog
           import android.app.PendingIntent
-          import android.app.TimePickerDialog
-          import android.content.Context
-          import android.content.Intent
-          import android.content.pm.PackageManager
-          import android.os.Build
-          import android.os.Bundle
-          import android.provider.Settings
-          import android.view.View
-          import android.widget.ArrayAdapter
-          import android.widget.Button
-          import android.widget.EditText
-          import android.widget.LinearLayout
-          import android.widget.ListView
-          import android.widget.TextView
-          import android.widget.Toast
-          import androidx.appcompat.app.AppCompatActivity
-          import androidx.core.app.ActivityCompat
-          import androidx.core.content.ContextCompat
-          import java.util.Calendar
-          import java.util.Locale
-
-          class MainActivity : AppCompatActivity() {
-              private var hour = -1
-              private var minute = -1
-              private val list = ArrayList<String>()
-              private val codes = ArrayList<Int>()
-              private lateinit var adapter: ArrayAdapter<String>
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  val pref = getSharedPreferences("UserProfile", Context.MODE_PRIVATE)
-                  val uName = pref.getString("userName", "Sagar")
-                  val uAge = pref.getString("userAge", "")
-                  supportActionBar?.title = "\$uName (\$uAge)"
-
-                  val layout = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      setPadding(35, 35, 35, 35)
-                  }
-                  val topSpace = View(this).apply {
-                      layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 160)
-                  }
-                  layout.addView(topSpace)
-
-                  val etName = EditText(this).apply {
-                      hint = "1. औषधाचे नाव (उदा. Pacimol)"
-                      setBackgroundResource(android.R.drawable.edit_text)
-                  }
-                  val etDose = EditText(this).apply {
-                      hint = "2. डोस प्रमाण (उदा. 500 mg)"
-                      setBackgroundResource(android.R.drawable.edit_text)
-                  }
-                  val tvTime = TextView(this).apply {
-                      text = "3. वेळ निवडलेली नाही"
-                      textSize = 16f
-                      setPadding(10, 15, 10, 15)
-                  }
-                  val btnTime = Button(this).apply { text = "वेळ निवडा (Time)" }
-                  val btnSave = Button(this).apply { text = "नवीन औषध सेव्ह करा" }
-                  val lv = ListView(this)
-
-                  layout.addView(etName); layout.addView(etDose); layout.addView(tvTime)
-                  layout.addView(btnTime); layout.addView(btnSave); layout.addView(lv)
-                  setContentView(layout)
-
-                  adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, list)
-                  lv.adapter = adapter
-                  loadData(); askPerm()
-
-                  btnTime.setOnClickListener {
-                      val c = Calendar.getInstance()
-                      TimePickerDialog(this, { _, h, m ->
-                          hour = h; minute = m
-                          tvTime.text = String.format(Locale.getDefault(), "वेळ: %02d:%02d", h, m)
-                      }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), false).show()
-                  }
-

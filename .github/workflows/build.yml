@@ -6,9 +6,6 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,11 +14,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
+
       - name: Auto Setup Full Android Project & App
         run: |
           ns=$(python3 -c 'print(bytes.fromhex("687474703a2f2f736368656d61732e616e64726f69642e636f6d2f61706b2f7265732f616e64726f6964").decode())')
 
-          # १. मुख्य प्रोजेक्ट फाईल्स (settings.gradle आणि build.gradle) तयार करा
+          # १. मुख्य प्रोजेक्ट फाईल्स तयार करा
           cat << 'EOF' > settings.gradle
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
@@ -178,11 +186,6 @@ jobs:
           }
           EOF
 
-          # ७. MainActivity.kt तयार करा (तिन्ही बॉक्स + Edit/Delete + औषधांची यादी)
+          # ७. MainActivity.kt तयार करा (तुमचा पूर्ण कोड इथे असावा)
           cat << 'EOF' > app/src/main/java/com/sagar/medicinereminder/MainActivity.kt
-          package com.sagar.medicinereminder
-
-          import android.Manifest
-          import android.app.AlarmManager
-          import android.app.AlertDialog
-          import android.app.PendingIntent
+          

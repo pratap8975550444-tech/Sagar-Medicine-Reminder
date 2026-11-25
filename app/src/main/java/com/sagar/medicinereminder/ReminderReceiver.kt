@@ -6,30 +6,31 @@ import android.content.*
 import android.os.Build
 
 class ReminderReceiver : BroadcastReceiver() {
+
     override fun onReceive(context: Context, intent: Intent) {
+
+        val name = intent.getStringExtra("name") ?: "Medicine"
+
         val manager = context.getSystemService(
             Context.NOTIFICATION_SERVICE
         ) as NotificationManager
 
-        val channel = "medicine_reminder"
+        val channelId = "medicine_reminder"
 
-        if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    channel,
-                    "Medicine Reminder",
-                    NotificationManager.IMPORTANCE_HIGH
-                )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Medicine Reminder",
+                NotificationManager.IMPORTANCE_HIGH
             )
+            manager.createNotificationChannel(channel)
         }
 
-        val name = intent.getStringExtra("name") ?: "Medicine"
-
-        val notification = if (Build.VERSION.SDK_INT >= 26) {
-            Notification.Builder(context, channel)
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, channelId)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentTitle("Medicine Reminder")
-                .setContentText("Time to take: $name")
+                .setContentTitle("औषध घेण्याची वेळ झाली आहे!")
+                .setContentText("आता औषध घ्या: $name")
                 .setAutoCancel(true)
                 .build()
         } else {
@@ -41,6 +42,6 @@ class ReminderReceiver : BroadcastReceiver() {
                 .build()
         }
 
-        manager.notify(1, notification)
+        manager.notify(System.currentTimeMillis().toInt(), notification)
     }
 }

@@ -27,3 +27,11 @@
     </application>
 
 </manifest>
+<receiver
+    android:name=".BootReceiver"
+    android:enabled="true"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+    </intent-filter>
+</receiver>
